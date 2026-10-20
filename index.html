@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobilné presýpacie hodiny</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0f172a;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .frame {
+            width: 240px;
+            height: 340px;
+            border: 10px solid #8B4513;
+            background: rgba(255, 255, 255, 0.03);
+            position: relative;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .flipped {
+            transform: rotate(180deg);
+        }
+
+        .frame::before, .frame::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to bottom right, transparent 48.5%, #8B4513 48.5%, #8B4513 51.5%, transparent 51.5%),
+                        linear-gradient(to top right, transparent 48.5%, #8B4513 48.5%, #8B4513 51.5%, transparent 51.5%);
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .bulb-top, .bulb-bottom {
+            position: absolute;
+            width: 100%;
+            height: 50%;
+            overflow: hidden;
+        }
+
+        .bulb-top { top: 0; }
+        .bulb-bottom { bottom: 0; }
+
+        .sand-top {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            transition: height 0.1s linear;
+        }
+
+        .sand-bottom {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            transition: height 0.1s linear;
+            clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+        }
+
+        .stream {
+            position: absolute;
+            top: 50%;
+            left: 48.5%;
+            width: 3%;
+            height: 0%;
+            background: #f59e0b;
+            z-index: 4;
+            transform: translateX(-50%);
+        }
+
+        .stream.active {
+            height: 50%;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background: #3b82f6;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            transition: background 0.2s;
+        }
+
+        button:active {
+            background: #2563eb;
+        }
+
+        .status {
+            font-size: 13px;
+            color: #94a3b8;
+            text-align: center;
+            max-width: 280px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="frame" id="hourglass">
+            <div class="bulb-top">
+                <div class="sand-top" id="sandTop" style="height: 100%;"></div>
+            </div>
+            <div class="stream" id="stream"></div>
+            <div class="bulb-bottom">
+                <div class="sand-bottom" id="sandBottom" style="height: 0%;"></div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="flipBtn">Ручной переворот</button>
+            <button id="permBtn">Включить гироскоп</button>
+        </div>
+
+        <div class="status" id="statusText">Поверните телефон или используйте кнопку для переворота.</div>
+    </div>
+
+    <script>
+        const hourglass = document.getElementById('hourglass');
+        const sandTop = document.getElementById('sandTop');
+        const sandBottom = document.getElementById('sandBottom');
+        const stream = document.getElementById('stream');
+        const flipBtn = document.getElementById('flipBtn');
+        const permBtn = document.getElementById('permBtn');
+        const statusText = document.getElementById('statusText');
+
+        let isFlipped = false;
+        let progress = 100;
+        const DURATION = 30;
+        let timer = null;
+
+        function startSimulation() {
+            if (timer) clearInterval(timer);
+            stream.classList.add('active');
+
+            timer = setInterval(() => {
+                progress -= (100 / (DURATION * 10));
+                if (progress <= 0) {
+                    progress = 0;
+                    stream.classList.remove('active');
+                    clearInterval(timer);
+                }
+
+                if (!isFlipped) {
+                    sandTop.style.height = progress + '%';
+                    sandBottom.style.height = (100 - progress) + '%';
+                } else {
+                    sandTop.style.height = (100 - progress) + '%';
+                    sandBottom.style.height = progress + '%';
+                }
+            }, 100);
+        }
+
+        function toggleFlip() {
+            isFlipped = !isFlipped;
+            hourglass.classList.toggle('flipped', isFlipped);
+            progress = 100 - progress;
+            startSimulation();
+        }
+
+        flipBtn.addEventListener('click', toggleFlip);
+
+        window.addEventListener('deviceorientation', (event) => {
+            let beta = event.beta;
+            if (beta !== null) {
+                if (Math.abs(beta) > 110 && !isFlipped) {
+                    toggleFlip();
+                } else if (Math.abs(beta) < 70 && isFlipped) {
+                    toggleFlip();
+                }
+            }
+        });
+
+        permBtn.addEventListener('click', () => {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(response => {
+                        if (response === 'granted') {
+                            statusText.innerText = "Гироскоп активирован успешно!";
+                            permBtn.style.display = 'none';
+                        } else {
+                            statusText.innerText = "Доступ к датчикам отклонен.";
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                statusText.innerText = "Гироскоп поддерживается автоматически.";
+                permBtn.style.display = 'none';
+            }
+        });
+
+        startSimulation();
+    </script>
+</body>
+</html>
